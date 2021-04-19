@@ -1,14 +1,16 @@
 import datetime
 from resnet18 import *
-from new_utils import *
+from utils import *
 setup_seed(6666)
 
 
-train_loader = load_data(data_root="../data")
-iter_val_loader = load_data(data_root="../data", train=False, n_items=512)
-epoch_val_loader, test_loader = load_data(data_root="../data", train=False)
+train_loader = load_data()
+iter_val_loader = load_data(train=False, n_items=512)
+epoch_val_loader, test_loader = load_data(train=False)
 
 net = ResNet18().to(device)
+# net = ResNet18(if_bn=False).to(device)
+# net = PlainNet().to(device)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=8, min_lr=1e-4)
@@ -19,7 +21,7 @@ val_err = []
 
 start_time = datetime.datetime.now()
 for epoch in range(32):
-    acc = train_model(epoch, (train_loader, val_loader, epoch_val_loader), (loss_list, train_err, val_err), (net, criterion, optimizer))
+    acc = train_model(epoch, (train_loader, iter_val_loader, epoch_val_loader), (loss_list, train_err, val_err), (net, criterion, optimizer))
     scheduler.step(acc)
 end_time = datetime.datetime.now()
 print('Training time:%d' % (end_time - start_time).seconds)
