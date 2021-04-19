@@ -18,61 +18,86 @@ def setup_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-# class PartialDataset(torch.utils.data.Dataset):
-#     def __init__(self, dataset, n_items=10):
-#         self.dataset = dataset
-#         self.n_items = n_items
+class PartialDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, n_items=10):
+        self.dataset = dataset
+        self.n_items = n_items
 
-#     def __getitem__(self, num):
-#         return self.dataset.__getitem__(num)
+    def __getitem__(self, num):
+        return self.dataset.__getitem__(num)
 
-#     def __len__(self):
-#         return min(self.n_items, len(self.dataset))
+    def __len__(self):
+        return min(self.n_items, len(self.dataset))
 
-#     def partial(self):
-#         part_dataset = []
-#         for i in range(self.__len__()):
-#             part_dataset.append(self.__getitem__(i))
-#         return part_dataset
+    def partial(self):
+        part_dataset = []
+        for i in range(self.__len__()):
+            part_dataset.append(self.__getitem__(i))
+        return part_dataset
 
 
-def load_data(data_root="./data", batch_size=128, val_size=6400):
+# def load_data_old(data_root="./data", batch_size=128, train=True, n_items=-1):
+#     normalization = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+#     if train:
+#         transform = transforms.Compose([
+#             transforms.RandomCrop(32, padding=4),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.ToTensor(),
+#             normalization
+#         ])
+#     else:
+#         transform = transforms.Compose([
+#             transforms.ToTensor(),
+#             normalization
+#         ])
+
+#     dataset = torchvision.datasets.CIFAR10(root=data_root, train=train, transform=transform)
+#     if n_items > 0:
+#         dataset = PartialDataset(dataset, n_items).partial()
+#     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=16)
+#     return loader
+
+
+
+
+
+def load_data(data_root="./data", batch_size=128, train=True, n_items=-1):
     normalization = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        normalization
-    ])
-    transform_val = transforms.Compose([
-        transforms.ToTensor(),
-        normalization
-    ])
-    
-    train_set = torchvision.datasets.CIFAR10(root=data_root, train=True, transform=transform_train)
-    test_set = torchvision.datasets.CIFAR10(root=data_root, train=False, transform=transform_val)
-#     val_set, test_set = torch.utils.data.random_split(test_set, [val_size, 10000 - val_size])
-    
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, num_workers=16)
-    val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=16)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, num_workers=16)
-    
-    # avoid copying data from memory to GPU memory over again
-    train_loader_list = [(x.to(device), l.to(device)) for (x, l) in train_loader]
-    val_loader_list = [(x.to(device), l.to(device)) for (x, l) in val_loader]
-#     test_loader_list = [(x.to(device), l.to(device)) for (x, l) in test_loader]
-    
-    return train_loader_list, val_loader_list#, test_loader_list
+    if train:
+        transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalization
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalization
+        ])
+
+    dataset = torchvision.datasets.CIFAR10(root=data_root, train=train, transform=transform)
+    if n_items > 0:
+        dataset = PartialDataset(dataset, n_items).partial()
+    if n_items > 0 or train:
+        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=16)
+        return loader
+    else: # val and test set
+        val_set, test_set = torch.utils.data.random_split(dataset, [7680, 10000 - 7680])
+        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=16)
+        test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, num_workers=16)
+        return val_loader, test_loader
 
 
-def get_acc(model, loader_list):
+def get_val_acc(model, loader):
     # evaluate the model
-#     list_loader = [(x_.to(device), l_.to(device)) for (x_, l_) in loader] if not isinstance(loader, list) else loader
+    list_loader = [(x_.to(device), l_.to(device)) for (x_, l_) in loader] if not isinstance(loader, list) else loader
     model.eval()
     total_correct = 0
     total_num = 0
     with torch.no_grad():
-        for x, label in loader_list:
+        for x, label in list_loader:
+            # x, label = x.to(device), label.to(device)
             pred = model(x).argmax(dim=1)
             correct = torch.eq(pred, label).float().sum().item()
             total_correct += correct
@@ -81,17 +106,17 @@ def get_acc(model, loader_list):
     return acc
 
 
-def train_model(epoch, loaders, save_lists, model):
+def train_model(epoch, loader, save_lists, model):
     # unpacking parameters
-    train_loader_list, val_loader_list = loaders
+    train_loader, iter_val_loader, epoch_val_loader = loader
     all_loss, train_err, val_err = save_lists
     net, criterion, optimizer = model
-    
-    val_acc = 0
-    for batch_idx, (x, label) in enumerate(train_loader_list):
+    iter_val_list = [(x.to(device), l.to(device)) for (x, l) in iter_val_loader]
+
+    for batch_idx, (x, label) in enumerate(train_loader):
         net.train()
         # forward pass
-#         x, label = x.to(device), label.to(device)
+        x, label = x.to(device), label.to(device)
         pred = net(x)
         loss = criterion(pred, label)
         all_loss.append(loss)
@@ -101,20 +126,20 @@ def train_model(epoch, loaders, save_lists, model):
         loss.backward()
         optimizer.step()
 
-        # get training accuracy per iteration
+        # get training accuracy per batch
         correct = torch.eq(pred.argmax(dim=1), label).float().sum().item()
         train_acc = correct / x.shape[0]
         train_err.append(1 - train_acc)
 
-        # get partial validation accuracy per iteration
-        val_acc = get_acc(net, val_loader_list[:4])  # 8 batches (1024) images
+        # get test accuracy per batch
+        val_acc = get_val_acc(net, iter_val_list)
         val_err.append(1 - val_acc)
 
         if batch_idx % 50 == 0:
             print(f'{epoch}\t{batch_idx}\tloss: {loss.item()}\tlr: {optimizer.param_groups[0]["lr"]:.5f}')
             print(f'train acc: {train_acc:.5f}\t validation acc: {val_acc:.5f}')
     # use the validation accuracy for the scheduler to decay learning rate
-    epoch_val_acc = get_acc(net, val_loader_list)
+    epoch_val_acc = get_val_acc(net, epoch_val_loader)
     print(f'epoch:{epoch:4}\tepoch acc: {epoch_val_acc}')
     return epoch_val_acc
 
