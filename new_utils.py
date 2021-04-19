@@ -51,7 +51,7 @@ def load_data(data_root="./data", batch_size=128, train=True, n_items=-1):
             normalization
         ])
 
-    dataset = torchvision.datasets.CIFAR10(root=data_root, train=train, download=False, transform=transform)
+    dataset = torchvision.datasets.CIFAR10(root=data_root, train=train, transform=transform)
     if n_items > 0:
         dataset = PartialDataset(dataset, n_items).partial()
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=16)
@@ -60,30 +60,33 @@ def load_data(data_root="./data", batch_size=128, train=True, n_items=-1):
 
 
 
-def new_load_data(data_root="./data", batch_size=128, val_size=8192):
+
+def load_data_new(data_root="./data", batch_size=128, train=True, n_items=-1):
     normalization = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        normalization
-    ])
-    transform_val = transforms.Compose([
-        transforms.ToTensor(),
-        normalization
-    ])
-    
-    train_set = torchvision.datasets.CIFAR10(root=data_root, train=True, transform=transform_train)
-    test_set = torchvision.datasets.CIFAR10(root=data_root, train=False, transform=transform_train)
-    train_set, val_set = torch.utils.data.random_split(train_set, [50000 - val_size, val_size])
-    
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, num_workers=16)
-    val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=16)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, num_workers=16)
+    if train:
+        transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalization
+        ])
+    else:
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalization
+        ])
 
-    return train_loader, val_loader, test_loader
-
-
+    dataset = torchvision.datasets.CIFAR10(root=data_root, train=train, transform=transform)
+    if n_items > 0:
+        dataset = PartialDataset(dataset, n_items).partial()
+    if n_items > 0 or train:
+        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=16)
+        return loader
+    else: # val and test set
+        val_set, test_set = torch.utils.data.random_split(dataset, [7680, 10000 - 7680])
+        val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=16)
+        test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, num_workers=16)
+        return val_loader, test_loader
 
 
 

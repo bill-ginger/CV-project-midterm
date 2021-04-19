@@ -36,7 +36,7 @@ def setup_seed(seed):
 #         return part_dataset
 
 
-def load_data(data_root="./data", batch_size=128, val_size=4096):
+def load_data(data_root="./data", batch_size=128, val_size=6400):
     normalization = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
@@ -51,18 +51,18 @@ def load_data(data_root="./data", batch_size=128, val_size=4096):
     
     train_set = torchvision.datasets.CIFAR10(root=data_root, train=True, transform=transform_train)
     test_set = torchvision.datasets.CIFAR10(root=data_root, train=False, transform=transform_val)
-    val_set, test_set = torch.utils.data.random_split(test_set, [val_size, 10000 - val_size])
+#     val_set, test_set = torch.utils.data.random_split(test_set, [val_size, 10000 - val_size])
     
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, num_workers=16)
     val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, num_workers=16)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, num_workers=16)
     
-    # avoid copying data from memory to GPU memory
+    # avoid copying data from memory to GPU memory over again
     train_loader_list = [(x.to(device), l.to(device)) for (x, l) in train_loader]
     val_loader_list = [(x.to(device), l.to(device)) for (x, l) in val_loader]
-    test_loader_list = [(x.to(device), l.to(device)) for (x, l) in test_loader]
+#     test_loader_list = [(x.to(device), l.to(device)) for (x, l) in test_loader]
     
-    return train_loader_list, val_loader_list, test_loader_list
+    return train_loader_list, val_loader_list#, test_loader_list
 
 
 def get_acc(model, loader_list):
@@ -101,13 +101,13 @@ def train_model(epoch, loaders, save_lists, model):
         loss.backward()
         optimizer.step()
 
-        # get training accuracy per batch
+        # get training accuracy per iteration
         correct = torch.eq(pred.argmax(dim=1), label).float().sum().item()
         train_acc = correct / x.shape[0]
         train_err.append(1 - train_acc)
 
         # get partial validation accuracy per iteration
-        val_acc = get_acc(net, val_loader_list[:8])  # 8 batches (1024) images
+        val_acc = get_acc(net, val_loader_list[:4])  # 8 batches (1024) images
         val_err.append(1 - val_acc)
 
         if batch_idx % 50 == 0:
