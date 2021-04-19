@@ -119,9 +119,8 @@ class PlainNet(nn.Module):
 
 
 
-'''
 class ResNet18GAP(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, if_bn=True):
         super(ResNet18GAP, self).__init__()
         self.layer0 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
@@ -134,7 +133,7 @@ class ResNet18GAP(nn.Module):
         self.layer3 = nn.Sequential(ResBlock(128, 256, 2, if_bn), ResBlock(256, 256, 1, if_bn))
         self.layer4 = nn.Sequential(ResBlock(256, 512, 2, if_bn), ResBlock(512, 512, 1, if_bn))
 
-        self.fc = nn.Linear(512, num_classes)
+        self.layer5 = nn.Conv2d(512, 10, kernel_size=1, stride=1, bias=False)
 
     def forward(self, x):
         x = self.layer0(x)
@@ -143,9 +142,8 @@ class ResNet18GAP(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
+        x = self.layer5(x)
         x = F.avg_pool2d(x, 4)
         x = torch.flatten(x, start_dim=1)
-        x = self.fc(x)
 
         return x
-'''
