@@ -9,6 +9,10 @@ class ResBlock(nn.Module):
         self.conv1 = nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channel) if batch_norm else nn.Sequential()
         self.relu = nn.ReLU(inplace=True)
+        self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh()
+        self.leaky_relu = nn.LeakyReLU(inplace=True)
+        self.elu = nn.ELU(inplace=True)
         self.conv2 = nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channel) if batch_norm else nn.Sequential()
 
@@ -25,31 +29,41 @@ class ResBlock(nn.Module):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
+        # out = self.sigmoid(out)
+        # out = self.tanh(out)
+        # out = self.leaky_relu(out)
+        # out = self.elu(out)
+
+
 
         out = self.conv2(out)
         out = self.bn2(out)
 
         out += identity
         out = self.relu(out)
+        # out = self.sigmoid(out)
+        # out = self.tanh(out)
+        # out = self.leaky_relu(out)
+        # out = self.elu(out)
 
         return out
 
 
 class ResNet18(nn.Module):
-    def __init__(self, num_classes=10, if_bn=True):
+    def __init__(self, num_classes=10, if_bn=True, channel=64):
         super(ResNet18, self).__init__()
         self.layer0 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(64) if if_bn else nn.Sequential(),
+            nn.Conv2d(3, channel, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(channel) if if_bn else nn.Sequential(),
             nn.ReLU()
         )
 
-        self.layer1 = nn.Sequential(ResBlock(64, 64, 1, if_bn), ResBlock(64, 64, 1, if_bn))
-        self.layer2 = nn.Sequential(ResBlock(64, 128, 2, if_bn), ResBlock(128, 128, 1, if_bn))
-        self.layer3 = nn.Sequential(ResBlock(128, 256, 2, if_bn), ResBlock(256, 256, 1, if_bn))
-        self.layer4 = nn.Sequential(ResBlock(256, 512, 2, if_bn), ResBlock(512, 512, 1, if_bn))
+        self.layer1 = nn.Sequential(ResBlock(channel, channel, 1, if_bn), ResBlock(channel, channel, 1, if_bn))
+        self.layer2 = nn.Sequential(ResBlock(channel, channel*2, 2, if_bn), ResBlock(channel*2, channel*2, 1, if_bn))
+        self.layer3 = nn.Sequential(ResBlock(channel*2, channel*4, 2, if_bn), ResBlock(channel*4, channel*4, 1, if_bn))
+        self.layer4 = nn.Sequential(ResBlock(channel*4, channel*8, 2, if_bn), ResBlock(channel*8, channel*8, 1, if_bn))
 
-        self.fc = nn.Linear(512, num_classes)
+        self.fc = nn.Linear(channel*8, num_classes)
 
     def forward(self, x):
         x = self.layer0(x)
