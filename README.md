@@ -1,7 +1,11 @@
 # Computer Vision
 Author: Haitian Jiang, Yuankun Yang, Siyu Yuan
-# CV-project-midterm
-## Model Factors
+
+***Model parameters are stored in `output-xxx/xxx-param.pth`***
+
+
+
+## Model Factors experiments
 ### Convolution Kernels
 ```
 nohup python3 main-template.py --experiment_name channel_size_16 --init_channel_size 16 &>channel_size_16.out
